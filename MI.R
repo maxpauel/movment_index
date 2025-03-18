@@ -42,3 +42,9 @@ p2=sum(abs(lm[[155]]-lm[[150]])+abs(lm[[160]]-lm[[150]])+abs(lm[[165]]-lm[[150]]
 p3=sum(abs(lm[[255]]-lm[[250]])+abs(lm[[260]]-lm[[250]])+abs(lm[[265]]-lm[[250]])+abs(lm[[270]]-lm[[250]]))/1706400
 d5_1=c(p1,p2,p3)
            
+f=function(x){as.matrix(as.data.frame(readPNG(x))[,1:ncol(readPNG(x))]*255)}
+  filenames <- list.files("/media/maxpauel/6372EF8A3B0879C1/C2C12/ISA_pub2/videos/с2с125день45Гц_red/", pattern="*.png", full.names=TRUE)
+  list <- parallel::parLapply(parallelCluster,filenames,f)
+lm=parallel::parLapply(parallelCluster,list,as.matrix)
+n1=parallel::parApply(parallelCluster,simplify2array((lm)), 1:2, function(x) mean(unlist(slide(as.vector(x),max,.before=0,.after=7,.step=7))-unlist(slide(as.vector(x),min,.before=0,.after=7,.step=7))))
+d5_1=c(quantile(n1),mean(n1))

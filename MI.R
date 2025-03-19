@@ -5,8 +5,11 @@ library("parallel")
 library("pheatmap")
 library("gplots")
 n.cores <- parallel::detectCores()
+# Create cluster for parallel calculation. Option type = 'PSOCK' for Windows, 'FORK' for Linux
 parallelCluster <- parallel::makeCluster(n.cores,type = "FORK")
+# Create function for ranking (for grayscale picture)
 range01 <- function(x){(x-min(x))/(max(x)-min(x))}
+# Set graphic parameters for heatmap
 breaks = seq(0, 50, length.out=256)
 gradient1 = colorpanel( sum( breaks[-1]<=2 ), "darkblue", "blue" )
 gradient2 = colorpanel( sum( breaks[-1]>2 & breaks[-1]<=5 ), "blue", "green" )
@@ -14,37 +17,34 @@ gradient3 = colorpanel( sum( breaks[-1]>5 & breaks[-1]<=10 ), "green", "yellow" 
 gradient4 = colorpanel( sum( breaks[-1]>10 ), "yellow", "red" )
 col = c(gradient1, gradient2, gradient3, gradient4)
 
+# Read stack of frames and get grayscale matricies
 f=function(x){as.matrix(as.data.frame(readPNG(x))[,1:ncol(readPNG(x))]*255)}
-  filenames <- list.files("/media/maxpauel/6372EF8A3B0879C1/C2C12/ISA_pub2/videos/с2с125день45Гц_red/", pattern="*.png", full.names=TRUE)
+  filenames <- list.files("/path_to_frames/", pattern="*.png", full.names=TRUE)
   list <- parallel::parLapply(parallelCluster,filenames,f)
 lm=parallel::parLapply(parallelCluster,list,as.matrix)
-n1=parallel::parApply(parallelCluster,simplify2array((list)), 1:2, function(x) mean(unlist(slide(as.vector(x),sd,.before=0,.after=5,.step=10)),na.rm=T))
-n1sd=parallel::parApply(parallelCluster,simplify2array((list)), 1:2, sd,na.rm=T)
-d5_1=c(quantile(n1),mean(n1),quantile(n1sd),mean(n1sd))
-n1s=range01(n1)
-n1sds=range01(n1sd)
-writePNG(n1s, '/media/maxpauel/6372EF8A3B0879C1/C2C12/ISA_pub2/videos/result_1/d5_1.png', dpi = NULL, asp = NULL, text = NULL, metadata = NULL)
-writePNG(n1sds, '/media/maxpauel/6372EF8A3B0879C1/C2C12/ISA_pub2/videos/result_1/d5_1_sd.png', dpi = NULL, asp = NULL, text = NULL, metadata = NULL)
-tiff('/media/maxpauel/6372EF8A3B0879C1/C2C12/ISA_pub2/videos/result_1/d5_1.tiff', units="in", width=15.8, height=10.8, res=1024)
+# Get mean standard deviation in sliding window for each pixel
+n1=parallel::parApply(parallelCluster,simplify2array((list)), 1:2, function(x) mean(unlist(slide(as.vector(x),sd,.before=0,.after=7,.step=7)),na.rm=T))
+# Calculate movement index (method - "sd in sliding window")                      
+IS1=mean(n1)
+# Get mean standard deviation for each pixel
+n2=parallel::parApply(parallelCluster,simplify2array((list)), 1:2, sd,na.rm=T)
+# Calculate movement index (method - "sd")                      
+IS2=mean(n2)
+# Create grayscale pictures for 'sd' and 'sd in sliding window'
+n1r=range01(n1)
+n2r=range01(n2)
+writePNG(n1r, '/your_path/IS1.png', dpi = NULL, asp = NULL, text = NULL, metadata = NULL)
+writePNG(n2r, '/your_path/IS2.png', dpi = NULL, asp = NULL, text = NULL, metadata = NULL)
+# Create heatmap pictures for 'sd' and 'sd in sliding window'
+tiff('/your_path/IS1_heatmap.tiff', units="in", width=15.8, height=10.8, res=512)
 pheatmap(n1,col=col,breaks=breaks,show_colnames=F,show_rownames=F,cluster_rows=FALSE, cluster_cols=FALSE,legend=F)
 dev.off()
-tiff('/media/maxpauel/6372EF8A3B0879C1/C2C12/ISA_pub2/videos/result_1/d5_1_sd.tiff', units="in", width=15.8, height=10.8, res=1024)
+tiff('/your_path/IS2_heatmap.tiff', units="in", width=15.8, height=10.8, res=512)
 pheatmap(n1sd,col=col,breaks=breaks,show_colnames=F,show_rownames=F,cluster_rows=FALSE, cluster_cols=FALSE,legend=F)
 dev.off()
-
-f=function(x){as.matrix(as.data.frame(readPNG(x))[,1:ncol(readPNG(x))]*255)}
-  filenames <- list.files("/media/maxpauel/6372EF8A3B0879C1/C2C12/ISA_pub2/videos/с2с125день45Гц_red/", pattern="*.png", full.names=TRUE)
-  list <- parallel::parLapply(parallelCluster,filenames,f)
+# Calculate movement index by Fudjita method. The denominator is the number of pixels in the matrix.
+IS3=sum(abs(lm[[15]]-lm[[10]])+abs(lm[[20]]-lm[[10]])+abs(lm[[25]]-lm[[10]])+abs(lm[[30]]-lm[[10]]))/1706400
+# Calculate movement index by method of extremes
 lm=parallel::parLapply(parallelCluster,list,as.matrix)
-
-p1=sum(abs(lm[[15]]-lm[[10]])+abs(lm[[20]]-lm[[10]])+abs(lm[[25]]-lm[[10]])+abs(lm[[30]]-lm[[10]]))/1706400
-p2=sum(abs(lm[[155]]-lm[[150]])+abs(lm[[160]]-lm[[150]])+abs(lm[[165]]-lm[[150]])+abs(lm[[170]]-lm[[150]]))/1706400
-p3=sum(abs(lm[[255]]-lm[[250]])+abs(lm[[260]]-lm[[250]])+abs(lm[[265]]-lm[[250]])+abs(lm[[270]]-lm[[250]]))/1706400
-d5_1=c(p1,p2,p3)
-           
-f=function(x){as.matrix(as.data.frame(readPNG(x))[,1:ncol(readPNG(x))]*255)}
-  filenames <- list.files("/media/maxpauel/6372EF8A3B0879C1/C2C12/ISA_pub2/videos/с2с125день45Гц_red/", pattern="*.png", full.names=TRUE)
-  list <- parallel::parLapply(parallelCluster,filenames,f)
-lm=parallel::parLapply(parallelCluster,list,as.matrix)
-n1=parallel::parApply(parallelCluster,simplify2array((lm)), 1:2, function(x) mean(unlist(slide(as.vector(x),max,.before=0,.after=7,.step=7))-unlist(slide(as.vector(x),min,.before=0,.after=7,.step=7))))
-d5_1=c(quantile(n1),mean(n1))
+n3=parallel::parApply(parallelCluster,simplify2array((lm)), 1:2, function(x) mean(unlist(slide(as.vector(x),max,.before=0,.after=7,.step=7))-unlist(slide(as.vector(x),min,.before=0,.after=7,.step=7))))
+IS4=mean(n3)
